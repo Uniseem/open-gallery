@@ -635,7 +635,7 @@ onBeforeUnmount(() => {
             @pointerdown.stop
             @pointerup.stop
           >
-            <Icon name="tabler:zoom-in-area" class="size-4" />显示高清（≤ 5 MB）
+            <Icon name="tabler:zoom-in-area" class="size-4" />显示高清
           </button>
         </div>
         <PhotoActionMenu :open="actionMenu.open" :x="actionMenu.x" :y="actionMenu.y" :photo="currentPhoto" @close="actionMenu.open = false" />
