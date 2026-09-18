@@ -64,9 +64,11 @@ const mobileSlides = computed(() => {
   return result
 })
 
+// 手机端不提供「显示高清」：切到高清层时 src 重置为未加载，期间显示的占位是 320px 缩略图
+// （桌面端占位是 1.5 MB 预览图，所以没问题），5 MB 在移动网络上加载期间画面反而明显变糊。
 const mobileSlideSrc = (photo: GalleryPhoto, index: number) =>
   index === visualIndex.value
-    ? (showHigh.value ? photo.highUrl : photo.previewUrl)
+    ? photo.previewUrl
     : viewerReadyOriginalIds.value.has(photo.id)
       ? photo.previewUrl
     : photo.thumbnailUrl
@@ -625,7 +627,7 @@ onBeforeUnmount(() => {
           <PhotoGalleryThumbnail v-if="!isMobile" class="absolute inset-x-0 bottom-0 z-20 hidden md:block" :photos="photos" :current-index="currentIndex" @click.stop @dblclick.stop @index-change="emit('indexChange', $event)" />
 
           <button
-            v-if="!showHigh"
+            v-if="!showHigh && !isMobile"
             type="button"
             class="viewer-high-button absolute left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-neutral-700/65 px-4 py-2 text-xs font-semibold text-white shadow-xl backdrop-blur-2xl transition hover:bg-neutral-600/75 active:scale-95"
             @click.stop="showHigh = true"
@@ -651,7 +653,7 @@ onBeforeUnmount(() => {
 .viewer-no-select, .viewer-no-select * { -webkit-user-select: none !important; user-select: none !important; }
 .viewer-no-select img { -webkit-user-drag: none; }
 .viewer-mobile-counter { bottom: max(0.75rem, env(safe-area-inset-bottom)); }
-.viewer-high-button { bottom: max(2.8rem, calc(env(safe-area-inset-bottom) + 2.3rem)); }
+.viewer-high-button { bottom: 7.25rem; }
 .viewer-gesture-hint { padding-top: max(5.25rem, calc(env(safe-area-inset-top) + 4.5rem)); }
 .viewer-nav-frosted { background-color: rgb(82 82 91 / 62%); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
 .viewer-nav-frosted:hover { background-color: rgb(113 113 122 / 72%); }
@@ -661,5 +663,4 @@ onBeforeUnmount(() => {
 @keyframes pinch-left { 0%, 100% { left: 2.25rem; transform: scale(0.92); } 50% { left: 0.55rem; transform: scale(1.08); } }
 @keyframes pinch-right { 0%, 100% { right: 2.25rem; transform: scale(0.92); } 50% { right: 0.55rem; transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .viewer-finger-left, .viewer-finger-right { animation: none; } }
-@media (min-width: 768px) { .viewer-high-button { bottom: 7.25rem; } }
 </style>

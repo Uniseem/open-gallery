@@ -10,6 +10,15 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
 
 let pendingSiteSettingsRequest: Promise<SiteSettings> | null = null
 
+// 与后台重写前 useAdminApi 的 getAdminApiErrorMessage 同一优先级。那个模块已随后台迁到 admin/
+// 被删除；Nuxt 自动导入不写 import 语句，残留调用在构建时不报错，只会在请求失败时抛 ReferenceError。
+const requestErrorMessage = (requestError: unknown): string => {
+  if (typeof requestError === 'string') return requestError
+  if (!requestError || typeof requestError !== 'object') return '请求失败，请稍后重试'
+  const candidate = requestError as { data?: { error?: string, message?: string }, message?: string }
+  return candidate.data?.error || candidate.data?.message || candidate.message || '请求失败，请稍后重试'
+}
+
 export function useSiteSettings() {
   const settings = useState<SiteSettings>('chronoframe-site-settings', () => ({
     ...DEFAULT_SITE_SETTINGS,
@@ -40,7 +49,7 @@ export function useSiteSettings() {
     })
       .then(applySiteSettings)
       .catch((requestError) => {
-        error.value = getAdminApiErrorMessage(requestError)
+        error.value = requestErrorMessage(requestError)
         throw requestError
       })
       .finally(() => {
