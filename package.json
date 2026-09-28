@@ -1,0 +1,48 @@
+{
+  "name": "open-gallery",
+  "version": "1.0.0-rc.4",
+  "author": "Uniseem",
+  "contributors": [
+    "Uniseem",
+    "Claude",
+    "GPT",
+    "DeepSeek"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-admin.mjs && nuxt generate",
+    "build:web": "nuxt generate",
+    "build:admin": "node scripts/build-admin.mjs",
+    "dev": "nuxt dev --host",
+    "dev:admin": "pnpm --dir admin dev",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck",
+    "typecheck:admin": "pnpm --dir admin typecheck"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.111",
+    "@iconify-json/tabler": "^1.2.35",
+    "@nuxt/fonts": "0.14.0",
+    "@nuxt/icon": "2.2.3",
+    "@nuxt/ui": "^4.8.2",
+    "@nuxtjs/i18n": "10.4.0",
+    "@tailwindcss/vite": "^4.3.0",
+    "@vueuse/core": "^14.3.0",
+    "@vueuse/nuxt": "14.3.0",
+    "@yeger/vue-masonry-wall": "^6.1.1",
+    "dayjs": "^1.11.21",
+    "dayjs-nuxt": "2.1.11",
+    "motion-v": "^2.3.0",
+    "nuxt": "^4.4.8",
+    "tailwindcss": "^4.3.0",
+    "vue": "^3.5.35"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vue-tsc": "^3.3.11"
+  },
+  "packageManager": "pnpm@10.34.1"
+}

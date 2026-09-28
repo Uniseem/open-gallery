@@ -1,0 +1,201 @@
+<script setup lang="ts">
+import { motion } from 'motion-v'
+import type { AsyncDataRequestStatus } from '#app'
+import type { GalleryPhoto } from '~~/shared/types/photo'
+
+defineProps<{ photos: GalleryPhoto[]; status: AsyncDataRequestStatus }>()
+const isMobile = useMediaQuery('(max-width: 768px)')
+const { filteredPhotos, hasActiveFilters } = usePhotoFilters()
+const { sortedPhotos } = usePhotoSort()
+const showTop = ref(false)
+const masonryWrapper = ref<HTMLElement>()
+const headerRef = ref<HTMLElement>()
+const headerHeight = ref(0)
+const headerColumnWidth = ref(280)
+const gap = 4
+
+const displayPhotos = computed(() => hasActiveFilters.value ? filteredPhotos.value : sortedPhotos.value)
+const { openPhoto } = useViewerRoute(displayPhotos, '/photos')
+const items = computed(() => displayPhotos.value.map((photo, index) => ({ photo, index, id: photo.id })))
+const columnWidth = computed(() => 280)
+const maxColumns = computed(() => isMobile.value ? 2 : 8)
+const headerOffset = computed(() => isMobile.value ? 0 : headerHeight.value + gap)
+const headerStyle = computed(() => isMobile.value
+  ? { width: '100%', marginBottom: `${gap}px` }
+  : { width: `${headerColumnWidth.value}px` })
+const selectionMode = ref(false)
+const selectedIds = ref(new Set<string>())
+const selectionAnchor = ref<number | null>(null)
+const actionMenu = reactive<{ open: boolean; x: number; y: number; photo: GalleryPhoto | null }>({
+  open: false,
+  x: 0,
+  y: 0,
+  photo: null,
+})
+const selectedPhotos = computed(() => displayPhotos.value.filter(photo => selectedIds.value.has(photo.id)))
+
+const replaceSelection = (ids: Iterable<string>) => { selectedIds.value = new Set(ids) }
+const cancelSelection = () => {
+  selectionMode.value = false
+  selectedIds.value = new Set()
+  selectionAnchor.value = null
+}
+const toggleSelection = (index: number, event?: MouseEvent | KeyboardEvent) => {
+  const photo = displayPhotos.value[index]
+  if (!photo) return
+  selectionMode.value = true
+  const next = new Set(selectedIds.value)
+  if (event?.shiftKey && selectionAnchor.value !== null && !isMobile.value) {
+    const start = Math.min(selectionAnchor.value, index)
+    const end = Math.max(selectionAnchor.value, index)
+    for (let current = start; current <= end; current += 1) {
+      const item = displayPhotos.value[current]
+      if (item) next.add(item.id)
+    }
+  } else if (next.has(photo.id)) next.delete(photo.id)
+  else next.add(photo.id)
+  selectionAnchor.value = index
+  replaceSelection(next)
+  if (!next.size) cancelSelection()
+}
+const openActionMenu = (photo: GalleryPhoto | null, x: number, y: number) => {
+  Object.assign(actionMenu, { open: true, photo, x, y })
+}
+const enterSelection = (photo: GalleryPhoto | null) => {
+  selectionMode.value = true
+  if (!photo) return
+  const index = displayPhotos.value.findIndex(item => item.id === photo.id)
+  if (index >= 0 && !selectedIds.value.has(photo.id)) toggleSelection(index)
+}
+const handleActivate = (index: number, event: MouseEvent | KeyboardEvent) => {
+  if (selectionMode.value) toggleSelection(index, event)
+  else openPhoto(index)
+}
+const onEmptyContextMenu = (event: MouseEvent) => {
+  if ((event.target as Element).closest('[data-photo-id]')) return
+  event.preventDefault()
+  openActionMenu(null, event.clientX, event.clientY)
+}
+const selectAll = () => {
+  selectionMode.value = true
+  replaceSelection(displayPhotos.value.map(photo => photo.id))
+}
+
+const updateHeaderWidth = () => {
+  if (isMobile.value) return
+  const column = masonryWrapper.value?.querySelector<HTMLElement>('.masonry-wall .masonry-column')
+  headerColumnWidth.value = column?.getBoundingClientRect().width || columnWidth.value
+}
+
+useResizeObserver(headerRef, (entries) => {
+  const entry = entries[0]
+  if (entry) headerHeight.value = entry.contentRect.height
+})
+useResizeObserver(masonryWrapper, updateHeaderWidth)
+watch(isMobile, () => nextTick(updateHeaderWidth))
+watch(() => items.value.length, () => nextTick(updateHeaderWidth))
+
+const dateRangeText = computed(() => {
+  const dates = displayPhotos.value
+    .map(photo => new Date(photo.dateTaken))
+    .filter(date => !Number.isNaN(date.getTime()) && date.getTime() > 0)
+    .sort((a, b) => b.getTime() - a.getTime())
+  if (!dates.length) return ''
+  return `${formatGalleryDate(dates.at(-1)!.toISOString())} – ${formatGalleryDate(dates[0]!.toISOString())}`
+})
+
+const onScroll = () => { showTop.value = window.scrollY > 500 }
+const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
+onMounted(() => window.addEventListener('scroll', onScroll, { passive: true }))
+onMounted(() => nextTick(updateHeaderWidth))
+onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
+useEventListener('keydown', (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && selectionMode.value) cancelSelection()
+})
+watch(() => displayPhotos.value.map(photo => photo.id).join('\u0000'), () => {
+  const available = new Set(displayPhotos.value.map(photo => photo.id))
+  replaceSelection([...selectedIds.value].filter(id => available.has(id)))
+  if (!selectedIds.value.size) selectionMode.value = false
+})
+</script>
+
+<template>
+  <div class="relative w-full">
+    <div class="p-0.5 sm:p-1" :class="isMobile && 'pt-2'">
+      <div
+        ref="masonryWrapper"
+        class="relative"
+        :style="{ '--masonry-header-offset': `${headerOffset}px` }"
+        @contextmenu="onEmptyContextMenu"
+      >
+        <div
+          ref="headerRef"
+          class="masonry-header-wrapper"
+          :class="!isMobile && 'masonry-header-desktop'"
+          :style="headerStyle"
+        >
+          <MasonryItemHeader :total="displayPhotos.length" :date-range-text="dateRangeText" />
+        </div>
+
+        <div v-if="(status === 'idle' || status === 'pending') && !photos.length" class="grid min-h-[45vh] place-items-center" :style="!isMobile ? { paddingTop: `${headerOffset}px` } : undefined">
+          <Icon name="tabler:loader-2" class="size-8 animate-spin text-primary" />
+        </div>
+        <div v-else-if="status === 'error' && !photos.length" class="grid min-h-[45vh] place-items-center text-center text-neutral-500" :style="!isMobile ? { paddingTop: `${headerOffset}px` } : undefined">
+          <div><Icon name="tabler:cloud-off" class="mx-auto mb-3 size-10" /><p>{{ $t('ui.photo.loadError') }}</p></div>
+        </div>
+        <div v-else-if="!displayPhotos.length" class="grid min-h-[35vh] place-items-center text-center text-neutral-500" :style="!isMobile ? { paddingTop: `${headerOffset}px` } : undefined">
+          <div><Icon name="tabler:photo-off" class="mx-auto mb-3 size-10" /><p>{{ $t('ui.stats.noPhotosTip') }}</p></div>
+        </div>
+        <MasonryGallery
+          v-else
+          class="masonry-wall masonry-wall-with-header"
+          :items="items"
+          :column-width="columnWidth"
+          :gap="gap"
+          :min-columns="2"
+          :max-columns="maxColumns"
+          :first-column-offset="headerOffset"
+        >
+          <template #default="{ item }">
+            <MasonryItem
+              :photo="item.photo"
+              :index="item.index"
+              :selected="selectedIds.has(item.photo.id)"
+              :selection-mode="selectionMode"
+              @activate="handleActivate"
+              @select="toggleSelection"
+              @context-action="openActionMenu"
+            />
+          </template>
+        </MasonryGallery>
+      </div>
+    </div>
+
+    <motion.div
+      v-if="showTop"
+      class="masonry-back-to-top fixed right-4 z-40 sm:right-6"
+      :initial="{ opacity: 0, scale: 0.8 }"
+      :animate="{ opacity: 1, scale: 1 }"
+    >
+      <UButton icon="tabler:arrow-up" color="neutral" variant="soft" size="lg" class="rounded-full bg-white/80 shadow-lg backdrop-blur dark:bg-neutral-900/80" @click="scrollToTop" />
+    </motion.div>
+
+    <PhotoActionMenu
+      :open="actionMenu.open"
+      :x="actionMenu.x"
+      :y="actionMenu.y"
+      :photo="actionMenu.photo"
+      allow-select
+      @close="actionMenu.open = false"
+      @select="enterSelection"
+    />
+    <PhotoBulkActionBar :selected="selectedPhotos" :all-count="displayPhotos.length" @cancel="cancelSelection" @select-all="selectAll" />
+  </div>
+</template>
+
+<style scoped>
+.masonry-header-wrapper { z-index: 1; }
+.masonry-header-desktop { left: 0; position: absolute; top: 0; }
+.masonry-wall-with-header :deep(.masonry-column:first-child .masonry-item:first-child) { margin-top: 0; }
+.masonry-back-to-top { bottom: max(1rem, env(safe-area-inset-bottom)); }
+</style>

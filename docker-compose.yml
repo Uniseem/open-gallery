@@ -1,0 +1,22 @@
+# 项目已更名为 open-gallery，但以下名称有意保持 chronoframe，改掉会弄坏已有部署：
+# - Compose 项目名与服务名：更新时会另起一套容器，与旧容器争抢同一端口和同一个 ./data；
+# - 数据库文件名 chronoframe.db：新容器会找不到旧库，创建一个空数据库。
+name: chronoframe
+
+services:
+  chronoframe:
+    image: ghcr.io/uniseem/open-gallery:latest
+    pull_policy: always
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    ports:
+      - "${CHRONOFRAME_BIND:-0.0.0.0}:${CHRONOFRAME_PORT:-8188}:8080"
+    environment:
+      CF_DATABASE_URL: sqlite:///app/data/chronoframe.db?mode=rwc
+      CF_MASTER_KEY_FILE: /app/data/secret.key
+      CF_CONVERSION_WORKERS: "${CF_CONVERSION_WORKERS:-7}"
+      CF_COOKIE_SECURE: "${CF_COOKIE_SECURE:-auto}"
+      CF_TRUST_PROXY_HEADERS: "${CF_TRUST_PROXY_HEADERS:-true}"
+    volumes:
+      - ./data:/app/data
